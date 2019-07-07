@@ -1,0 +1,100 @@
+#include "BluetoothSerial.h" //Header File for Serial Bluetooth
+#include <TinyGPS++.h> //Library to manage GPS data
+#include "WiFi.h"
+
+BluetoothSerial ESP_BT; //Object for Bluetooth
+TinyGPSPlus gps; //Se define como objeto de la librería la variable gps
+
+#define GPS_RXD2 16
+#define GPS_TXD2 17
+
+#define WIFI_SSID       "WIFI_NAME"
+#define WIFI_PASSWORD   "1234"
+
+#define REDIS_ADDR      "h" 
+#define REDIS_PORT      p 
+#define REDIS_PASSWORD  "a"  
+
+char datGPS=' ';
+int incoming;
+int OUTLED = 2;
+
+uint32_t nextSerialTaskTs = 0;
+
+void setup() {
+  // Note the format for setting a serial port is as follows: Serial2.begin(baud-rate, protocol, RX pin, TX pin);
+  Serial.begin(9600);
+  //Serial1.begin(9600, SERIAL_8N1, RXD2, TXD2);
+  Serial2.begin(9600, SERIAL_8N1, GPS_RXD2, GPS_TXD2);
+  Serial.println("Serial Txd is on pin: "+String(GPS_TXD2));
+  Serial.println("Serial Rxd is on pin: "+String(GPS_RXD2));
+
+  ESP_BT.begin("Shellock_Dev"); //Name of your Bluetooth Signal
+  Serial.println("Bluetooth Device is Ready to Pair");
+
+  pinMode (OUTLED, OUTPUT);//Specify that LED pin is output
+
+   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+ 
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.println("Connecting to WiFi..");
+  }
+ 
+  Serial.println("Connected to the WiFi network");
+}
+
+void loop() { //Choose Serial1 or Serial2 as required
+  if (Serial2.available()) {
+    
+    if (nextSerialTaskTs < millis()) {
+
+        //datGPS = char(Serial2.read());
+        //Serial.print(datGPS);
+        //ESP_BT.print(datGPS);
+        
+        gps.encode(Serial2.read());
+
+        char lats[32];
+        //double dls = gps.location.lat();
+        //dtostrf(dls, 3, 3, lats);
+
+        //char themsg[10];
+        sprintf(lats,"%4.3f",gps.location.lat());
+
+        Serial.print("Full=");  Serial.println(Serial2.read());
+        Serial.print("LAT=");  Serial.println(lats);
+        Serial.print("LONG="); Serial.println(gps.location.lng(), 6);
+        Serial.print("ALT=");  Serial.println(gps.altitude.meters());
+        Serial.print("Sats=");  Serial.println(gps.satellites.value());
+
+        ESP_BT.print("Full=");  ESP_BT.println(Serial2.read());
+        ESP_BT.print("LAT=");  ESP_BT.println(lats);
+        ESP_BT.print("LONG="); ESP_BT.println(gps.location.lng(), 6);
+        ESP_BT.print("ALT=");  ESP_BT.println(gps.altitude.meters());
+        ESP_BT.print("Sats=");  ESP_BT.println(gps.satellites.value());
+
+        nextSerialTaskTs = millis() + TASK_SERIAL_RATE;
+    }
+  }
+
+  if (ESP_BT.available()) //Check if we receive anything from Bluetooth
+  {
+    incoming = ESP_BT.read(); //Read what we recevive 
+    Serial.print("Received:"); Serial.println(incoming);
+
+    if (incoming == 49)
+        {
+        digitalWrite(OUTLED, HIGH);
+        ESP_BT.println("LED turned ON");
+        Serial.print("LED turned ON");
+        }
+        
+    if (incoming == 48)
+        {
+        digitalWrite(OUTLED, LOW);
+        ESP_BT.println("LED turned OFF");
+        Serial.print("LED turned OFF");
+        }   
+  }
+}
